@@ -3,7 +3,6 @@ import csv
 import pandas as pd
 import datetime
 def mysqlconnect(): 
-    # To connect MySQL database 
     conn = pymysql.connect( 
         host='localhost', 
         user='root',  
@@ -40,32 +39,25 @@ def create_tables(cur):
     Organizer CHAR(8) NOT NULL
     );''')
 
-def handle_command_e(cur):
-    create_tables(cur)
-    print("Tables checked and created if not present.")
-
-def handle_command_c(cur):
+def command_c(cur):
     cur.execute("DELETE FROM Game;")
     cur.execute("DELETE FROM Player;")
     cur.execute("DELETE FROM Tournament;")
-    print("All data cleared.")
 
-def handle_command_p(conn, cur, row):
+def command_p(conn, cur, row):
     try:
-        # Validate the rating
         rating = float(row[3])
         if rating < 0:
             print(f"{','.join(row)} Input Invalid")
             return
 
-        # Insert the player into the database
         cur.execute("INSERT INTO Player (ID, Name, Rating) VALUES (%s, %s, %s)", (row[1], row[2], rating))
         conn.commit()
     except pymysql.MySQLError as e:
         print(f"{','.join(row)} Input Invalid")
         conn.rollback()
 
-def handle_command_g(conn, cur, row, tournament=None):
+def command_g(conn, cur, row, tournament=None):
     try:
         # Construct the time string in the correct format
         date_part = row[1]  # Expected format: YYYYMMDD
@@ -87,7 +79,7 @@ def handle_command_g(conn, cur, row, tournament=None):
             return
 
         # Check if there are earlier games without results for either player
-        if check_earlier_games_without_results(cur, acidic_id, time_str) or check_earlier_games_without_results(cur, alkaline_id, time_str):
+        if check_earlier_games(cur, acidic_id, time_str) or check_earlier_games(cur, alkaline_id, time_str):
             print(f"{','.join(row)} Input Invalid")
             return
 
@@ -115,6 +107,10 @@ def handle_command_g(conn, cur, row, tournament=None):
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                 (time_str, acidic_id, alkaline_id, ac_score, ak_score, ac_rating, ak_rating, tournament)
             )
+
+            # Update player ratings
+            cur.execute("UPDATE Player SET Rating = %s WHERE ID = %s", (ac_rating, acidic_id))
+            cur.execute("UPDATE Player SET Rating = %s WHERE ID = %s", (ak_rating, alkaline_id))
         else:
             # Game without results
             cur.execute(
@@ -128,8 +124,7 @@ def handle_command_g(conn, cur, row, tournament=None):
         print(f"{','.join(row)} Input Invalid")
         conn.rollback()
         
-def check_earlier_games_without_results(cur, player_id, game_time):
-    """Check if a player has any earlier games without results."""
+def check_earlier_games(cur, player_id, game_time):
     cur.execute("""
         SELECT COUNT(*) FROM Game 
         WHERE (Acidic = %s OR Alkaline = %s) 
@@ -139,7 +134,7 @@ def check_earlier_games_without_results(cur, player_id, game_time):
     count = cur.fetchone()[0]
     return count > 0
 
-def handle_command_r(conn, cur, row):
+def command_r(conn, cur, row):
     try:
         # Construct the time string in the correct format
         date_part = row[1]  # Expected format: YYYYMMDD
@@ -150,7 +145,7 @@ def handle_command_r(conn, cur, row):
         alkaline_id = row[4]
         
         # Check if there are earlier games without results for either player
-        if check_earlier_games_without_results(cur, acidic_id, time_str) or check_earlier_games_without_results(cur, alkaline_id, time_str):
+        if check_earlier_games(cur, acidic_id, time_str) or check_earlier_games(cur, alkaline_id, time_str):
             print(f"{','.join(row)} Input Invalid")
             return
         
@@ -183,7 +178,7 @@ def handle_command_r(conn, cur, row):
         print(f"{','.join(row)} Input Invalid")
         conn.rollback()
 
-def handle_command_t(conn, cur, row, reader):
+def command_t(conn, cur, row, reader):
     try:
         tournament_name = row[1]
         organizer_id = row[2]
@@ -191,9 +186,7 @@ def handle_command_t(conn, cur, row, reader):
         
         # Insert the tournament
         cur.execute("INSERT INTO Tournament (Name, Organizer) VALUES (%s, %s)", (tournament_name, organizer_id))
-        conn.commit()
-        print(f"Tournament {tournament_name} added.")
-        
+        conn.commit()        
         # Process the subsequent game commands
         games_processed = 0
         while games_processed < num_games:
@@ -201,20 +194,18 @@ def handle_command_t(conn, cur, row, reader):
             command = game_row[0]
             
             if command == 'g':
-                handle_command_g(conn, cur, game_row, tournament_name)
+                command_g(conn, cur, game_row, tournament_name)
                 games_processed += 1
             elif command in ('e', 'c', 't'):
-                # Ignore these commands until all tournament games are processed
                 pass
             else:
-                # Process other commands as normal
                 process_command(conn, cur, command, game_row, reader)
                 
     except pymysql.MySQLError as e:
         print(f"{','.join(row)} Input Invalid")
         conn.rollback()
 
-def handle_query_p(cur, player_id):
+def query_p(cur, player_id):
     try:
         cur.execute("""
             SELECT 
@@ -235,7 +226,7 @@ def handle_query_p(cur, player_id):
     except pymysql.MySQLError as e:
         print(f"Error querying player: {e}")
 
-def handle_query_t(cur, tournament_name):
+def query_t(cur, tournament_name):
     try:
         cur.execute("""
             SELECT 
@@ -264,7 +255,7 @@ def handle_query_t(cur, tournament_name):
     except pymysql.MySQLError as e:
         print(f"Error querying tournament: {e}")
 
-def handle_query_h(cur, player1_id, player2_id):
+def query_h(cur, player1_id, player2_id):
     try:
         cur.execute("""
             SELECT 
@@ -293,7 +284,7 @@ def handle_query_h(cur, player1_id, player2_id):
     except pymysql.MySQLError as e:
         print(f"Error querying head-to-head games: {e}")
 
-def handle_query_d(cur, start_date, end_date):
+def query_d(cur, start_date, end_date):
     try:
         # Format dates properly
         start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
@@ -326,25 +317,25 @@ def handle_query_d(cur, start_date, end_date):
 
 def process_command(conn, cur, command, row, reader):
     if command == 'e':
-        handle_command_e(cur)
+        create_tables(cur)
     elif command == 'c':
-        handle_command_c(cur)
+        command_c(cur)
     elif command == 'p':
-        handle_command_p(conn, cur, row)
+        command_p(conn, cur, row)
     elif command == 'g':
-        handle_command_g(conn, cur, row)
+        command_g(conn, cur, row)
     elif command == 'r':
-        handle_command_r(conn, cur, row)
+        command_r(conn, cur, row)
     elif command == 't':
-        handle_command_t(conn, cur, row, reader)
+        command_t(conn, cur, row, reader)
     elif command == 'P':
-        handle_query_p(cur, row[1])
+        query_p(cur, row[1])
     elif command == 'T':
-        handle_query_t(cur, row[1])
+        query_t(cur, row[1])
     elif command == 'H':
-        handle_query_h(cur, row[1], row[2])
+        query_h(cur, row[1], row[2])
     elif command == 'D':
-        handle_query_d(cur, row[1], row[2])
+        query_d(cur, row[1], row[2])
     else:
         print(f"Unknown command: {command}")
 
