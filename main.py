@@ -2,17 +2,18 @@ import pymysql
 import csv
 import pandas as pd
 import datetime
-def mysqlconnect(): 
+ddef mysqlconnect(): 
+
     conn = pymysql.connect( 
         host='localhost', 
-        user='root',  
-        password = "shadow916", 
-        db='testdb', 
+        user='cs5330',  
+        password = "pw5330", 
+        db='dbprog', 
         ) 
     cur = conn.cursor() 
     cur.execute("select @@version") 
-    cur.execute(" CREATE DATABASE IF NOT EXISTS testdb")
-    cur.execute("USE testdb")
+    cur.execute(" CREATE DATABASE IF NOT EXISTS dbprog")
+    cur.execute("USE dbprog")
     return conn, cur
 
 def create_tables(cur):
