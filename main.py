@@ -5,14 +5,14 @@ import datetime
 def mysqlconnect(): 
     conn = pymysql.connect( 
         host='localhost', 
-        user='cs5330',  
-        password = "pw5330", 
-        db='dbprog', 
+        user='root',  
+        password = "shadow916", 
+        db='testdb', 
         ) 
     cur = conn.cursor() 
     cur.execute("select @@version") 
-    cur.execute(" CREATE DATABASE IF NOT EXISTS dbprog")
-    cur.execute("USE dbprog")
+    cur.execute(" CREATE DATABASE IF NOT EXISTS testdb")
+    cur.execute("USE testdb")
     return conn, cur
 
 def create_tables(cur):
@@ -78,11 +78,6 @@ def command_g(conn, cur, row, tournament=None):
             print(f"{','.join(row)} Input Invalid")
             return
 
-        # Check if there are earlier games without results for either player
-        if check_earlier_games(cur, acidic_id, time_str) or check_earlier_games(cur, alkaline_id, time_str):
-            print(f"{','.join(row)} Input Invalid")
-            return
-
         # Check if results are provided
         has_results = len(row) > 8
 
@@ -98,6 +93,11 @@ def command_g(conn, cur, row, tournament=None):
             ac_rating = float(row[7])
             ak_rating = float(row[8])
             if ac_rating < 0 or ak_rating < 0:
+                print(f"{','.join(row)} Input Invalid")
+                return
+
+            # Check if there are earlier games without results for either player
+            if check_earlier_games(cur, acidic_id, time_str) or check_earlier_games(cur, alkaline_id, time_str):
                 print(f"{','.join(row)} Input Invalid")
                 return
 
