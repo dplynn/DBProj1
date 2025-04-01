@@ -2,7 +2,7 @@ import pymysql
 import csv
 import pandas as pd
 import datetime
-ddef mysqlconnect(): 
+def mysqlconnect(): 
 
     conn = pymysql.connect( 
         host='localhost', 
